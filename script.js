@@ -7,12 +7,12 @@ const gamePoints = document.querySelector('.points');
 let wizard = undefined;
 
 const keys = {};
+let upKeysQueue = [];
 const scene = {
     get score() {
         return Number(gamePoints.textContent);
     },
     set score(v) {
-        console.log(wizardCoordinates.isInAir());
         if (!wizardCoordinates.isInAir()) {
             return;
         }
@@ -22,7 +22,8 @@ const scene = {
 
 const game = {
     speed: 2,
-    wizardMultiplier: 4
+    wizardMultiplier: 4,
+    lastFireBall: 0
 };
 
 function onKeyDown(e) {
@@ -30,6 +31,7 @@ function onKeyDown(e) {
 }
 
 function onKeyUp(e) {
+    upKeysQueue.push(upKeyMapping[e.code]);
     delete keys[e.code];
 }
 
@@ -69,12 +71,12 @@ const wizardCoordinates = {
         this.wizard.style.left = utils.numberToPx(newValue);
     },
     isInAir() {
-        return (wizardCoordinates.y  +wizard.offsetHeight) < gameArea.offsetHeight;
+        return (wizardCoordinates.y + wizard.offsetHeight) < gameArea.offsetHeight;
     }
 
 };
 
-const keyMapping = {
+const downKeyMapping = {
     ArrowUp() {
         wizardCoordinates.y -= game.speed * game.wizardMultiplier;
     },
@@ -86,15 +88,35 @@ const keyMapping = {
     },
     ArrowRight() {
         wizardCoordinates.x += game.speed * game.wizardMultiplier;
+    },
+    Space(timestamp) {
+        wizard.classList.add('wizard-fire');
+        if (timestamp - 1000 > game.lastFireBall) {
+            game.lastFireBall = timestamp;
+            addFireBall(wizardCoordinates);
+        }
     }
 };
 
-function processKeys() {
+const upKeyMapping = {
+    Space() {
+        wizard.classList.remove('wizard-fire');
+    }
+};
+
+function processKeys(timestamp) {
     Object.keys(keys).forEach(key => {
-        if (keyMapping.hasOwnProperty(key)) {
-            keyMapping[key]();
+        if (downKeyMapping.hasOwnProperty(key)) {
+            downKeyMapping[key](timestamp);
         }
     });
+
+    upKeysQueue = upKeysQueue.reduce((acc, current) => {
+        if (current !== undefined) {
+            current();
+        }
+        return acc.slice(-1);
+    }, []);
 }
 
 gameStart.addEventListener('click', function gameStartHandler() {
@@ -113,13 +135,32 @@ gameStart.addEventListener('click', function gameStartHandler() {
     window.requestAnimationFrame(gameAction);
 });
 
+function addFireBall(player) {
+    const fireBall = document.createElement('div');
+    fireBall.classList.add('fire-ball');
+    fireBall.style.top = (player.y + wizard.offsetHeight / 3 - 5) + 'px';
+    fireBall.x = player.x + wizard.offsetWidth;
+    fireBall.style.left = fireBall.x + 'px';
+    gameArea.appendChild(fireBall);
+}
+
 
 function gameAction(timestamp) {
-    processKeys();
+    processKeys(timestamp);
 
     if (wizardCoordinates.isInAir()) {
         wizardCoordinates.y += game.speed;
     }
     scene.score++;
+
+
+    const fireBalls = [...document.querySelectorAll('.fire-ball')];
+    fireBalls.forEach(function (fireBall) {
+        fireBall.x += (game.speed * 5);
+        fireBall.style.left = `${fireBall.x}px`;
+        if (fireBall.x + fireBall.offsetWidth > gameArea.offsetWidth) {
+            fireBall.remove();
+        }
+    });
     window.requestAnimationFrame(gameAction);
 }
