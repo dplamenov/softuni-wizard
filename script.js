@@ -1,11 +1,10 @@
 const gameStart = document.querySelector('.game-start');
 const gameArea = document.querySelector('.game-area');
 const gameOver = document.querySelector('.game-over');
-const gameScore = document.querySelector('.game-score');
 const gamePoints = document.querySelector('.points');
 
 let wizard = undefined;
-
+let id = 0;
 const keys = {};
 let upKeysQueue = [];
 const scene = {
@@ -23,7 +22,9 @@ const scene = {
 const game = {
     speed: 2,
     wizardMultiplier: 4,
-    lastFireBall: 0
+    lastFireBall: 0,
+    lastCloud: 0,
+    lastBug: 0
 };
 
 function onKeyDown(e) {
@@ -75,6 +76,23 @@ const wizardCoordinates = {
     }
 
 };
+
+function isCollision(first, second) {
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+
+    return !(
+        firstRect.top > secondRect.bottom ||
+        firstRect.bottom < secondRect.top ||
+        firstRect.right < secondRect.left ||
+        firstRect.left > secondRect.right
+    );
+}
+
+function gameOverFunc() {
+    window.cancelAnimationFrame(id);
+    gameOver.classList.remove('hide');
+}
 
 const downKeyMapping = {
     ArrowUp() {
@@ -144,15 +162,15 @@ function addFireBall(player) {
     gameArea.appendChild(fireBall);
 }
 
-
 function gameAction(timestamp) {
+    id = window.requestAnimationFrame(gameAction);
     processKeys(timestamp);
 
     if (wizardCoordinates.isInAir()) {
         wizardCoordinates.y += game.speed;
     }
-    scene.score++;
 
+    scene.score++;
 
     const fireBalls = [...document.querySelectorAll('.fire-ball')];
     fireBalls.forEach(function (fireBall) {
@@ -162,5 +180,54 @@ function gameAction(timestamp) {
             fireBall.remove();
         }
     });
-    window.requestAnimationFrame(gameAction);
+
+
+    if (timestamp - game.lastCloud > 2000 + 20000 * Math.random()) {
+        let cloud = document.createElement('div');
+        cloud.classList.add('cloud');
+        cloud.style.left = `${gameArea.offsetWidth - 200}px`;
+        cloud.style.top = `${(gameArea.offsetHeight - 200) * Math.random()}px`;
+        gameArea.appendChild(cloud);
+        game.lastCloud = timestamp;
+    }
+
+    const clouds = [...document.querySelectorAll('.cloud')];
+    clouds.forEach(cloud => {
+        cloud.style.left = utils.numberToPx(utils.pxToNumber(cloud.style.left) - game.speed);
+
+        if (utils.pxToNumber(cloud.style.left) <= 0) {
+            cloud.remove();
+        }
+    });
+
+    if (timestamp - game.lastBug > 1500 + 5000 * Math.random()) {
+        let bug = document.createElement('div');
+        bug.classList.add('bug');
+        bug.style.left = `${gameArea.offsetWidth - 60}px`;
+        bug.style.top = `${(gameArea.offsetHeight - 60) * Math.random()}px`;
+        gameArea.appendChild(bug);
+        game.lastBug = timestamp;
+    }
+
+    let bugs = [...document.querySelectorAll('.bug')];
+    bugs.forEach(bug => {
+        bug.style.left = `${utils.pxToNumber(bug.style.left) - game.speed * 3}px`;
+
+
+        if (isCollision(wizard, bug)) {
+            return gameOverFunc();
+        }
+
+        fireBalls.forEach(function (fireBall) {
+            if(isCollision(fireBall, bug)){
+                bug.remove();
+                fireBall.remove();
+                scene.score += 1000;
+            }
+        });
+
+        if (utils.pxToNumber(bug.style.left) <= 0) {
+            bug.remove();
+        }
+    });
 }
